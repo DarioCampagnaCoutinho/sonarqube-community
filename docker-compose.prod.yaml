@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: sonarqube-nginx
+    depends_on:
+      - sonarqube
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    networks:
+      - sonarnet
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    depends_on:
+      - db
+    expose:
+      - "9000"
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://db:5432/sonarqube
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonarpass
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    restart: unless-stopped
+    networks:
+      - sonarnet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  db:
+    image: postgres:15
+    container_name: sonarqube-db
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonarpass
+      - POSTGRES_DB=sonarqube
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - sonarnet
+
+volumes:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+  postgresql:
+networks:
+  sonarnet:
+    driver: bridge
